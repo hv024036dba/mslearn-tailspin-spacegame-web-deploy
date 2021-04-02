@@ -12,6 +12,7 @@ stages:
     displayName: 'Build job'
     pool:
       vmImage: 'ubuntu-18.04'
+    ##name: 'MyAgentPool'  for self hosted
       demands:
       - npm
     variables:
@@ -46,21 +47,15 @@ stages:
         command: 'restore'
         projects: '**/*.csproj'
 
-    - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
-      inputs:
-        command: 'build'
-        arguments: '--no-restore --configuration $(buildConfiguration)'
-        projects: '**/*.csproj'
+    - template: templates/build.yml
+      parameters:
+        buildConfiguration: 'Debug'
 
-    - task: DotNetCoreCLI@2
-      displayName: 'Publish the project - $(buildConfiguration)'
-      inputs:
-        command: 'publish'
-        projects: '**/*.csproj'
-        publishWebProjects: false
-        arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
-        zipAfterPublish: true
+    - template: templates/build.yml
+      parameters:
+        buildConfiguration: 'Release'
+
+        ### Template can help in reusing the code.
 
     - publish: '$(Build.ArtifactStagingDirectory)'
       artifact: drop
@@ -78,11 +73,14 @@ stages:
       runOnce:
         deploy:
           steps:
-          - download: current  ### Will down the artificat from current run
+          - download: current
+          ### Will down the artificat from current run
             artifact: drop
           - task: AzureWebApp@1
             displayName: 'Azure App Service Deploy: Website'
             inputs:
               azureSubscription: 'Resource Manager - Tailspin - Space Game'
               appName: '$(WebAppName)'
+              ### WebAppName is saved as a group variable hence no need to define it in pipeline
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+###Notice the use of the download and AzureWebApp@1 tasks. $(WebAppName) reads the web app name from your pipeline variable.
